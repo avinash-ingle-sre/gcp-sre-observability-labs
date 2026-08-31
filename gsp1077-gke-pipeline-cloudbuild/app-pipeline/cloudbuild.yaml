@@ -1,0 +1,64 @@
+substitutions:
+  _SHORT_SHA: 'v1.0'
+  _COMMIT_SHA: 'v1.0'
+
+steps:
+- name: 'python:3.7-slim'
+  id: Test
+  entrypoint: /bin/sh
+  args:
+  - -c
+  - 'pip install flask && python test_app.py -v'
+
+- name: 'gcr.io/cloud-builders/docker'
+  id: Build
+  args:
+  - 'build'
+  - '-t'
+  - 'us-east4-docker.pkg.dev/qwiklabs-gcp-04-7a841c01a8a3/my-repository/hello-cloudbuild:$_SHORT_SHA'
+  - '.'
+
+- name: 'gcr.io/cloud-builders/docker'
+  id: Push
+  args:
+  - 'push'
+  - 'us-east4-docker.pkg.dev/qwiklabs-gcp-04-7a841c01a8a3/my-repository/hello-cloudbuild:$_SHORT_SHA'
+
+- name: 'gcr.io/cloud-builders/gcloud'
+  id: Clone env repo
+  entrypoint: /bin/sh
+  args:
+  - '-c'
+  - |
+    git clone http://giteaadmin:GiteaPassword123@34.86.40.49:3000/giteaadmin/hello-cloudbuild-env.git && \
+    cd hello-cloudbuild-env && \
+    git checkout candidate && \
+    git config user.email "student@qwiklabs.net" && \
+    git config user.name "Cloud Build"
+
+- name: 'gcr.io/cloud-builders/gcloud'
+  id: Generate manifest
+  entrypoint: /bin/sh
+  args:
+  - '-c'
+  - |
+     sed "s/GOOGLE_CLOUD_PROJECT/qwiklabs-gcp-04-7a841c01a8a3/g" kubernetes.yaml.tpl | \
+     sed "s/COMMIT_SHA/${_SHORT_SHA}/g" > hello-cloudbuild-env/kubernetes.yaml
+
+- name: 'gcr.io/cloud-builders/gcloud'
+  id: Push manifest
+  entrypoint: /bin/sh
+  args:
+  - '-c'
+  - |
+    set -x && \
+    cd hello-cloudbuild-env && \
+    git add kubernetes.yaml && \
+    git commit -m "Deploying image us-east4-docker.pkg.dev/qwiklabs-gcp-04-7a841c01a8a3/my-repository/hello-cloudbuild:${_SHORT_SHA}
+    Built from commit ${_COMMIT_SHA} of repository hello-cloudbuild-app
+    Author: $(git log --format='%an <%ae>' -n 1 HEAD)" && \
+    git push origin candidate
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  

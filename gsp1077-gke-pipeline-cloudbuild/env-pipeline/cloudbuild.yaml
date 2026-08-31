@@ -1,0 +1,32 @@
+substitutions:
+  _COMMIT_SHA: 'v1.0'
+
+steps:
+- name: 'gcr.io/cloud-builders/kubectl'
+  id: Deploy
+  args:
+  - 'apply'
+  - '-f'
+  - 'kubernetes.yaml'
+  env:
+  - 'CLOUDSDK_COMPUTE_REGION=us-east4'
+  - 'CLOUDSDK_CONTAINER_CLUSTER=hello-cloudbuild'
+
+- name: 'gcr.io/cloud-builders/gcloud'
+  id: Copy to production branch
+  entrypoint: /bin/sh
+  args:
+  - '-c'
+  - |
+    set -x && \
+    git clone -b production http://giteaadmin:GiteaPassword123@34.86.40.49:3000/giteaadmin/hello-cloudbuild-env.git prod_repo && \
+    cd prod_repo && \
+    git config user.email "student@qwiklabs.net" && \
+    git config user.name "Cloud Build" && \
+    cp ../kubernetes.yaml kubernetes.yaml && \
+    git add kubernetes.yaml && \
+    git commit -m "Deployed manifest from commit $_COMMIT_SHA" && \
+    git push origin production
+
+options:
+  logging: CLOUD_LOGGING_ONLY
